@@ -1,0 +1,22 @@
+---
+title: "Problem Set 8"
+author: "Rebecca Xi"
+date: "4/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Here I read in the necessary data. I load the trump_approval_poll from the
+# fivethirtyeight package. Using readr, read in the tweets.csv text file from
+# this repo’s “raw-data” folder.
+
+library(fivethirtyeight)
+library(readr)
+library(tidyverse)
+
+x <- load('raw-data/tweetsnew.Rdata')
+```
+
+## 
