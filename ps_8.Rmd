@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(fivethirtyeight)
 library(readr)
 library(skimr)
+library(ggplot2)
 library(tidyverse)
 
 poll <- trump_approval_poll
@@ -64,9 +65,41 @@ skim(tibble$approve)
 ```
 
 
-
-
 ### 1B) Bivariate correlations
+
+```{r 1B, echo=FALSE}
+
+# I want to replicate the plot from the problem set instructions, which displays
+# the approval rating vs. the tweet count for each week, colored in by grade. I
+# learned out how to use fct_explicit_na from
+# https://github.com/tidyverse/forcats/issues/122, in order to make any NA
+# values of grade explicit so as to not omit them from the plot. As usual, I
+# apply theme_classic() and the appropriate titles and axis labels to describe
+# the plot.
+
+plot <- tibble %>% 
+  mutate_if(is.factor, fct_explicit_na, na_level = "(Missing)") %>% 
+  ggplot(aes(x = total_tweets, y = approve, color = grade)) + 
+    geom_point() +
+    labs(
+      title = "Trump Approval Rating and Number of Tweets",
+      subtitle = "Data from fivethirtyeight and Trump Twitter Archive",
+      x = "Total Tweets",
+      y = "Approval Rating"
+    ) +
+    theme_classic()
+plot
+
+# Here I calculate the correlation coefficient between the approval rating and
+# the number of tweets
+
+corr <- tibble %>% 
+  summarize(corr = cor(total_tweets, approve))
+corr
+```
+
+There does not seem to be a strong relationship in either direction between 
+tweet activity and approval ratings. This is reflected by the scatterplot.
 
 
 
