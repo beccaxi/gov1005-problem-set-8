@@ -259,7 +259,7 @@ tweet count and political party would change Trump's approval ratings.
 
 ## Question 3: Generalize to many regressions
 
-```{r 3}
+```{r 3, echo=FALSE}
 
 # First and foremost, I create a new variable "month" in both original datasets,
 # in order to eventually be able to run a regression for each month. This code
@@ -277,9 +277,27 @@ poll <- poll %>%
 # Now I create the graphs on the right-hand side as seen in the problem set
 # instructions, using normal tidyverse functions (group_by, summarize, ggplot).
 # First, the top right hand graph plots the average approval rating by month and
-# poll quality. I create this graph using solely the poll dataset.
+# poll quality. I create this graph using solely the poll dataset, recreating
+# the high_q variable as before in order to provide an indicator of poll
+# quality.
 
-
+poll_plot <- poll %>% 
+  mutate(high_q = ifelse(
+    grade == "A+" |
+    grade == "A" |
+    grade == "A-", 
+    1, 0)
+  ) %>% 
+  group_by(month) %>% 
+  summarize(avg_approve = mean(approve)) %>% 
+  ggplot(aes(x = month, y = avg_approve)) +
+    geom_line(aes(color = poll$high_q)) +
+    labs(
+      title = "Approval Rating by Poll Quality",
+      x = "Month",
+      y = "Average Approval Rating"
+    ) +
+    theme_classic()
 
 # Second, the bottom right hand graph plots the total number of tweets by month.
 # I create this graph using solely the tweets_summarized tibble. 
