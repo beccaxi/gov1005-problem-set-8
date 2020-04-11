@@ -19,6 +19,7 @@ library(skimr)
 library(ggplot2)
 library(broom)
 library(gt)
+library(patchwork)
 library(tidyverse)
 
 poll <- trump_approval_poll
@@ -172,9 +173,63 @@ A frequentist intrepretation of the coefficients says that  ____________, while 
 
 ### 2C) Interaction Variables
 
+```{r 2C, echo=FALSE}
+
+# We are now interested in investigating whether there might be a specific
+# effect of more tweets on high quality polls, as opposed to looking at their
+# effects on approval rating independently. Here I essentially copy-paste the
+# code from 2B but run a new regression that includes total_tweets, high_q, and
+# the interaction between total tweets and high quality.
+
+new_lm <- tibble %>% 
+  lm(approve ~ total_tweets * high_q, data = .) %>% 
+  tidy(conf.int = TRUE) %>% 
+  select(term, estimate, conf.low, conf.high)
+
+new_lm_table <- new_lm %>% 
+  mutate_if(is.numeric, ~ round(., 5)) %>% 
+  gt() %>% 
+  tab_header(
+    title = "Effect of Number of Tweets and Poll Quality on Reported Approval Rating",
+    subtitle = "Data from fivethirtyeight and Trump Tweet Archive"
+  ) %>% 
+  cols_label(
+    term = "Variable",
+    estimate = "Estimate",
+    conf.low = "Lower bound",
+    conf.high = "Upper bound" 
+  ) %>% 
+  cols_align(align = "center")
+new_lm_table
+```
 
 
 ### 2D) Estimating Fitted Values
+
+```{r 2D}
+
+# From September 15 - September 19, 2017, Monmouth University ran a poll that
+# was rated A+. That week, President Trump tweeted 84 times. Here I write out
+# the formula that I would use to calculate the fitted value, or predicted
+# approval rating for that poll, given my results in the interaction model from
+# 2C. The value of high_q is 1 and the value of total_tweets is 84.
+# estimated(approval rating) =
+
+new_lm$estimate[1] + (new_lm$estimate[2] * 84) + (new_lm$estimate[3] * 1) +
+  (new_lm$estimate[4] * -2.70146 * 1)
+
+# I now check my work by recreating the (necessarily untidied) linear model from
+# 2C and then pulling the relevant fitted value using the predict() function. I
+# omit the customary echo=FALSE in order to print the code for both methods, for
+# sake of comparison.
+
+new_lm_untidied <- tibble %>% 
+  lm(approve ~ total_tweets * high_q, data = .)
+
+predict.lm(new_lm_untidied, newdata = tibble(high_q = 1, total_tweets = 84))
+```
+
+[the results are off by more than just a few decimal places! FINISH]
 
 
 ### 2E) Multiple Regression and the Rubin Causal Model
