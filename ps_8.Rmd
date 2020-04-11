@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(scipens = 100)
 
 # Here I read in the necessary data. I load the trump_approval_poll from the
 # fivethirtyeight package and use the readr package to read in the new tweets
@@ -16,6 +17,8 @@ library(fivethirtyeight)
 library(readr)
 library(skimr)
 library(ggplot2)
+library(broom)
+library(gt)
 library(tidyverse)
 
 poll <- trump_approval_poll
@@ -73,12 +76,15 @@ skim(tibble$approve)
 # the approval rating vs. the tweet count for each week, colored in by grade. I
 # learned out how to use fct_explicit_na from
 # https://github.com/tidyverse/forcats/issues/122, in order to make any NA
-# values of grade explicit so as to not omit them from the plot. As usual, I
-# apply theme_classic() and the appropriate titles and axis labels to describe
-# the plot.
+# values of grade explicit so as to not omit them from the plot, and I do this
+# separately from the plot code so that the tibble is all set for the rest of
+# the problem set. As usual, I apply theme_classic() and the appropriate titles
+# and axis labels to describe the plot.
+
+tibble <- tibble %>% 
+  mutate_if(is.factor, fct_explicit_na, na_level = "(Missing)")
 
 plot <- tibble %>% 
-  mutate_if(is.factor, fct_explicit_na, na_level = "(Missing)") %>% 
   ggplot(aes(x = total_tweets, y = approve, color = grade)) + 
     geom_point() +
     labs(
@@ -107,11 +113,66 @@ tweet activity and approval ratings. This is reflected by the scatterplot.
 
 ### 2A) Using lm()
 
+```{r 2A, echo=FALSE}
+
+# I'm interested in integrating grade as another variable to consider in the
+# relationship between approval rating and number of tweets. We saw in the plot
+# above that weeks with lower grades seem to fare better in approval rating than
+# weeks with higher grades, regardless of the number of tweets. Toward multiple
+# regression: here I use an ifelse condition to create a new variable “high_q”
+# which takes a value of 1 if the poll is rated A+, A, or A-, and 0 if the
+# rating is lower or missing.
+
+tibble <- tibble %>% 
+  mutate(high_q = ifelse(
+    grade == "A+" |
+    grade == "A" |
+    grade == "A-", 
+    1, 0)
+  )
+
+# Here I run a linear regression of approve on two variables: total_tweets and
+# high_q. I tidy up the data immediately and select term, estimate, conf.low,
+# and conf.high. I print a gt table with these values in a separate code chunk
+# so that I will be able to access the original linear model itself if need be.
+# I round to 5 decimal places for sufficient accuracy, using mutate_if() (from
+# https://stackoverflow.com/questions/27613310/rounding-selected-columns-of-data
+# -table-in-r).
+
+tibble_lm <- tibble %>% 
+  lm(approve ~ total_tweets + high_q, data = .) %>% 
+  tidy(conf.int = TRUE) %>% 
+  select(term, estimate, conf.low, conf.high)
+
+tibble_lm_table <- tibble_lm %>% 
+  mutate_if(is.numeric, ~ round(., 5)) %>% 
+  gt() %>% 
+  tab_header(
+    title = "Effect of Number of Tweets and Poll Quality on Reported Approval Rating",
+    subtitle = "Data from fivethirtyeight and Trump Tweet Archive"
+  ) %>% 
+  cols_label(
+    term = "Variable",
+    estimate = "Estimate",
+    conf.low = "Lower bound",
+    conf.high = "Upper bound" 
+  ) %>% 
+  cols_align(align = "center")
+tibble_lm_table
+```
+
 
 ### 2B) Interpreting results
 
+The estimated average treatment effect of high_q, i.e. the effect on approval rating of changing the binary variable high_q from 0 to 1, is -2.34720. It seems that, taking into account the other explanatory variable total_tweets, there is 
+an associated decrease of on average 2.34720 points in reported approval rating from switching from a low quality poll to a high quality poll. 
+
+A frequentist intrepretation of the coefficients says that  ____________, while a Bayesian interpretation says that ___________. [FINISH]
+
 
 ### 2C) Interaction Variables
+
+
 
 ### 2D) Estimating Fitted Values
 
