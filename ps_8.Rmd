@@ -9,14 +9,88 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 # Here I read in the necessary data. I load the trump_approval_poll from the
-# fivethirtyeight package. Using readr, read in the tweets.csv text file from
-# this repo’s “raw-data” folder.
+# fivethirtyeight package and use the readr package to read in the new tweets
+# Rdata file. this repo’s “raw-data” folder.
 
 library(fivethirtyeight)
 library(readr)
+library(skimr)
 library(tidyverse)
 
-x <- load('raw-data/tweetsnew.Rdata')
+poll <- trump_approval_poll
+load(file = 'raw-data/tweetsnew.Rdata')
 ```
 
-## 
+## Question 1: Conduct exploratory data analysis
+
+### 1A) Summary Statistics
+
+```{r 1A, echo=FALSE}
+
+# Here I group the tweet data by week and create a "total_tweets" variable,
+# recording the number of tweets that week (including retweets). This amounts to
+# counting the number of tweets per week and renaming the automatic "n" column
+# to the desired "total_tweets". Since all we care about is the tweet count,
+# discarding the other variables from the original tweets dataset is fine.
+
+tweets_summarized <- tweets %>% 
+  group_by(week) %>% 
+  count() %>% 
+  rename(total_tweets = n)
+
+# I then use the code from the problem set instructions to create a week
+# variable in the other dataset, poll. This is to facilitate joining the
+# summarized tweet data to the poll database.
+
+poll$week <- ceiling(
+  as.numeric(difftime(poll$end_date, "2017-01-01", units = "days")) / 7
+)
+
+# Now I join the tweet data to the poll data using the week variable, using
+# left_join with poll listed first. The joined tibble has 4929 observations. I
+# also use mutate() to assign total_tweets = 0 for weeks where there aren't any
+# tweets in the database, replacing any NAs.
+
+tibble <- poll %>% 
+  left_join(tweets_summarized, by = "week") %>% 
+  mutate(total_tweets = ifelse(is.na(total_tweets), 0, total_tweets))
+
+# Finally, I print the output of calling skim() on the total_tweets and approve
+# variables. These will be the two variables of interest when we move on to
+# correlations.
+
+skim(tibble$total_tweets)
+skim(tibble$approve)
+```
+
+
+
+
+### 1B) Bivariate correlations
+
+
+
+## Question 2: Run a multivariate regression
+
+### 2A) Using lm()
+
+
+### 2B) Interpreting results
+
+
+### 2C) Interaction Variables
+
+### 2D) Estimating Fitted Values
+
+
+### 2E) Multiple Regression and the Rubin Causal Model
+
+
+## Question 3: Generalize to many regressions
+
+
+
+
+
+
+
