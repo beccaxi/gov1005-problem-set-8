@@ -171,7 +171,10 @@ that, taking into account the other explanatory variable total_tweets, there is
 an associated decrease of on average 2.34720 points in reported approval rating
 from switching from a low quality poll to a high quality poll. 
 
-A frequentist intrepretation of the coefficients says that  ____________, while a Bayesian interpretation says that ___________. [FINISH]
+A frequentist intrepretation says that there are true values of the linear 
+model's parameters and that the coefficients are the point estimates of these 
+parameters, while a Bayesian interpretation treats the model parameters as 
+probability distributions which are to be inferred from real data.
 
 
 ### 2C) Interaction Variables
@@ -219,12 +222,14 @@ new_lm_table
 # estimated(approval rating) =
 
 new_lm$estimate[1] + (new_lm$estimate[2] * 84) + (new_lm$estimate[3] * 1) +
-  (new_lm$estimate[4] * -2.70146 * 1)
+  (new_lm$estimate[4] * 84 * 1)
 
 # I now check my work by recreating the (necessarily untidied) linear model from
 # 2C and then pulling the relevant fitted value using the predict() function. I
 # omit the customary echo=FALSE in order to print the code for both methods, for
-# sake of comparison.
+# sake of comparison. We see that the two values are identical, thanks to using
+# the original linear model values in the formula above, rather than the rounded
+# values in the gt table.
 
 new_lm_untidied <- tibble %>% 
   lm(approve ~ total_tweets * high_q, data = .)
@@ -232,7 +237,6 @@ new_lm_untidied <- tibble %>%
 predict.lm(new_lm_untidied, newdata = tibble(high_q = 1, total_tweets = 84))
 ```
 
-[the results are off by more than just a few decimal places! FINISH]
 
 
 ### 2E) Multiple Regression and the Rubin Causal Model
@@ -269,33 +273,38 @@ poll$month <- ceiling(poll$week / 4)
 tweets_summarized$month <- ceiling(tweets_summarized$week / 4)
 
 # Now I initialize the dataset for plotting by filtering my poll data to the
-# first 11 months
+# first 11 months, recreating the high_q variable as before in order to provide
+# an indicator of poll quality
 
 poll <- poll %>% 
-  filter(month < 12)
-
-# Now I create the graphs on the right-hand side as seen in the problem set
-# instructions, using normal tidyverse functions (group_by, summarize, ggplot).
-# First, the top right hand graph plots the average approval rating by month and
-# poll quality. I create this graph using solely the poll dataset, recreating
-# the high_q variable as before in order to provide an indicator of poll
-# quality.
-
-poll_plot <- poll %>% 
+  filter(month < 12) %>% 
+  mutate_if(is.factor, fct_explicit_na, na_level = "(Missing)") %>% 
   mutate(high_q = ifelse(
     grade == "A+" |
     grade == "A" |
     grade == "A-", 
     1, 0)
-  ) %>% 
-  group_by(month) %>% 
+  )
+
+# Now I create the graphs on the right-hand side as seen in the problem set
+# instructions, using normal tidyverse functions (group_by, summarize, ggplot).
+# First, the top right hand graph plots the average approval rating by month and
+# poll quality. I create this graph using solely the poll dataset.
+  
+poll_plot <- poll %>% 
+  group_by(month, high_q) %>% 
   summarize(avg_approve = mean(approve)) %>% 
-  ggplot(aes(x = month, y = avg_approve)) +
-    geom_line(aes(color = poll$high_q)) +
+  ggplot(aes(x = month, y = avg_approve, color = as.factor(high_q))) +
+    geom_line() +
     labs(
       title = "Approval Rating by Poll Quality",
       x = "Month",
-      y = "Average Approval Rating"
+      y = "Average Approval Rating",
+      color = "Poll Quality"
+    ) +
+    scale_color_manual(values = c("1" = "red", "0" = "blue")) +
+    theme(
+      legend.position = "top"
     ) +
     theme_classic()
 
@@ -304,6 +313,9 @@ poll_plot <- poll %>%
 
 
 
+# Here I print the plots and use patchwork to organize them.
+
+poll_plot
 
 ```
 
