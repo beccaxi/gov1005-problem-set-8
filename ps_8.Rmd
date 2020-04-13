@@ -272,9 +272,10 @@ tweet count and political party would change Trump's approval ratings.
 poll$month <- ceiling(poll$week / 4)
 tweets_summarized$month <- ceiling(tweets_summarized$week / 4)
 
-# Now I initialize the dataset for plotting by filtering my poll data to the
+# Now I initialize the datasets for plotting by filtering my poll data to the
 # first 11 months, recreating the high_q variable as before in order to provide
-# an indicator of poll quality
+# an indicator of poll quality. I likewise filter my tweets data to the first 11
+# months.
 
 poll <- poll %>% 
   filter(month < 12) %>% 
@@ -286,37 +287,157 @@ poll <- poll %>%
     1, 0)
   )
 
+tweets_summarized <- tweets_summarized %>% 
+  filter(month < 12)
+
 # Now I create the graphs on the right-hand side as seen in the problem set
 # instructions, using normal tidyverse functions (group_by, summarize, ggplot).
 # First, the top right hand graph plots the average approval rating by month and
-# poll quality. I create this graph using solely the poll dataset.
+# poll quality. I create this graph using solely the poll dataset. I have to
+# group by both month and high_q in order to be able to split the data by
+# high_q, and still calculate the average approval rating for each month. I had
+# to take care to change the position of the legend using theme() AFTER calling
+# theme_classic(), since theme_(.) overrides any prior theme calls.
   
 poll_plot <- poll %>% 
   group_by(month, high_q) %>% 
   summarize(avg_approve = mean(approve)) %>% 
-  ggplot(aes(x = month, y = avg_approve, color = as.factor(high_q))) +
+  ggplot(aes(x = month, y = avg_approve, color = factor(high_q))) +
     geom_line() +
     labs(
       title = "Approval Rating by Poll Quality",
       x = "Month",
-      y = "Average Approval Rating",
-      color = "Poll Quality"
+      y = "Average Approval Rating"
     ) +
-    scale_color_manual(values = c("1" = "red", "0" = "blue")) +
-    theme(
-      legend.position = "top"
+    scale_color_manual(
+      name = "Poll Quality", 
+      labels = c("Lower than A- or missing", "A-, A, A+"),
+      values = c("1" = "red", "0" = "blue")
+    ) +
+    theme_classic() +
+    theme(legend.position = "top")
+
+# Second, the bottom right hand graph plots the total number of tweets by month.
+# I create this graph using solely the tweets_summarized tibble. This is a
+# simpler plot than the previous one. Here I use geom_bar with both x and y
+# aesthetics, setting stat to "identity", in order to get the total tweet count
+# for each month on the y-axis.
+
+tweets_plot <- tweets_summarized %>% 
+  ggplot(aes(x = month, y = total_tweets)) +
+    geom_bar(stat = "identity") +
+    labs(
+      title = "Total Tweets",
+      subtitle = "President Trump",
+      x = "Month",
+      y = "Tweets"
     ) +
     theme_classic()
 
-# Second, the bottom right hand graph plots the total number of tweets by month.
-# I create this graph using solely the tweets_summarized tibble. 
+# Now I go about preparing the data for the two coefficient plots on the left
+# hand side. First, I re-join the two datasets, this time joining on both "week"
+# and "month". I then mutate total_tweets as before, to change all NAs to 0, and
+# then select for only the variables which might be relevant later on. This is
+# for efficiency and to clean up the dataset. I then pipe the dataset into
+# group_by(month), and then nest(), to create a tibble of tibbles. This tibble
+# has two columns, “month” and “data”, and 11 rows. Each row of the data column
+# is a list with all the observations for a given month. 
 
+data <- poll %>% 
+  left_join(tweets_summarized, by = c("week", "month")) %>% 
+  mutate(total_tweets = ifelse(is.na(total_tweets), 0, total_tweets)) %>% 
+  select(grade, approve, disapprove, poll_id, month, high_q, total_tweets) %>% 
+  group_by(month) %>% 
+  nest()
+  
+# Next, I create a "mod" column which uses map() to run lm on each row of the
+# tibble, as in 2A (with no interaction term). I then create a reg_results
+# column, using map() again to run tidy on the results of the linear model. Now,
+# for each "term", the dataset "data" includes the term, estimate, standard
+# error, t statistic, and p value. I store the term estimates for total_tweets
+# and high_q in coef_tweets and coef_quality, and the standard errors in
+# se_tweets and se_quality. Finally, I use those to create an upper and lower
+# column for the 95% confidence interval for each variable. This code was pretty
+# much taken from my work in Problem Set 7.
+  
+data <- data %>% 
+  mutate(
+    mod = map(data, function(list) lm(approve ~ total_tweets + high_q, data = list)),
+    reg_results = map(mod, function(list) tidy(list, conf.int = TRUE)),
+    coef_tweets = map_dbl(
+      reg_results, 
+      ~ filter(., term == "total_tweets") %>% 
+        pull(estimate)
+    ),
+    coef_quality = map_dbl(
+      reg_results, 
+      ~ filter(., term == "high_q") %>% 
+        pull(estimate)
+    ),
+    se_tweets = map_dbl(
+      reg_results,
+      ~ filter(., term == "total_tweets") %>% 
+        pull(std.error)
+    ),
+    se_quality = map_dbl(
+      reg_results,
+      ~ filter(., term == "high_q") %>% 
+        pull(std.error)
+    ),
+    upper_tweets = coef_tweets + 1.96 * se_tweets,
+    lower_tweets = coef_tweets - 1.96 * se_tweets,
+    upper_quality = coef_quality + 1.96 * se_quality,
+    lower_quality = coef_quality - 1.96 * se_quality
+  )
 
+# Now, I am ready to create plots of each of the coefficients for total_tweets
+# and high_q. I start here with total_tweets. I create a scatterplot of month
+# vs. the total_tweets coefficient and add error bars using the bounds of the
+# confidence interval, created above. I chose to replicate the design choices in
+# the problem set instructions as best I could, including adding a horizontal
+# dashed line at coefficient = 0 for reference, and coloring the points and
+# error bars light blue.
 
-# Here I print the plots and use patchwork to organize them.
+total_tweets_plot <- data %>% 
+  ggplot(aes(x = month, y = coef_tweets)) +
+    geom_point(color = "lightblue") +
+    geom_errorbar(
+      aes(x = month, ymin = lower_tweets, ymax = upper_tweets),
+      color = "lightblue"
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(
+      title = "Effect of Total Tweets on Estimated Approval Rating",
+      subtitle = "Controlling for Poll Quality",
+      x = "Month",
+      y = "Coefficient"
+    ) +
+    theme_classic()
 
-poll_plot
+# Now I want to create a near-identical scatterplot for the coefficient on
+# high_q. To that end, I copy-paste the code from above, and simply replace the
+# variables as appropriate. I again replicate the design choices in the problem
+# set instructions by coloring the points and error bars a dark green.
 
+poll_quality_plot <- data %>% 
+  ggplot(aes(x = month, y = coef_quality)) +
+    geom_point(color = "darkgreen") +
+    geom_errorbar(
+      aes(x = month, ymin = lower_quality, ymax = upper_quality),
+      color = "darkgreen"
+    ) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(
+      title = "Effect of Poll Quality on Estimated Approval Rating",
+      subtitle = "Controlling for Total Tweets",
+      x = "Month",
+      y = "Coefficient"
+    ) +
+    theme_classic()
+
+# Finally, I print the plots and use the patchwork package to organize them
+
+(total_tweets_plot | poll_plot) / (poll_quality_plot | tweets_plot) 
 ```
 
 
